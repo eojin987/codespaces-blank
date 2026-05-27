@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>학교폭력 예방 시뮬레이션</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        /* 모바일/태블릿 UI 하단바에 입력창 짤림 완벽 방지 코드 (100dvh) */
+        html, body { margin: 0; padding: 0; height: 100%; height: 100dvh; overflow: hidden; }
+        body { 
+            background-color: #b2c7d9; 
+            font-family: 'Malgun Gothic', sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            position: fixed; 
+            width: 100%; 
+        }
+        
+        header { background-color: #a1b6c8; padding: 15px; text-align: center; font-weight: bold; font-size: 18px; color: #111; flex-shrink: 0; }
+        
+        #chat-box { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; -webkit-overflow-scrolling: touch; }
+        
+        .msg-wrapper { display: flex; flex-direction: column; margin-bottom: 10px; max-width: 75%; }
+        .sender-name { font-size: 12px; margin-bottom: 4px; color: #444; }
+        .msg { padding: 8px 12px; border-radius: 12px; font-size: 15px; line-height: 1.4; word-break: break-all; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .bot-wrapper { align-items: flex-start; align-self: flex-start; }
+        .bot { background-color: #ffffff; border-top-left-radius: 2px; }
+        .user-wrapper { align-items: flex-end; align-self: flex-end; }
+        .user { background-color: #ffeb33; border-top-right-radius: 2px; }
+        
+        /* 하단 입력창 고정 및 아이폰 하단바(Safe Area) 대응 */
+        #input-area { 
+            background-color: #ffffff; 
+            padding: 10px; 
+            padding-bottom: env(safe-area-inset-bottom, 10px); 
+            display: none; /* 처음에 숨김 */
+            border-top: 1px solid #e2e2e2; 
+            flex-shrink: 0; 
+            width: 100%; 
+            box-sizing: border-box; 
+            align-items: center; 
+        }
+        #suggestion { flex: 1; border: 1px solid #ccc; outline: none; padding: 12px; border-radius: 20px; font-size: 15px; }
+        button#send-btn { background-color: #ffeb33; border: 1px solid #e0ce26; padding: 10px 20px; margin-left: 8px; border-radius: 20px; font-weight: bold; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+
+        /* [액정 깨짐 & 흔들림 연출] */
+        .shake-screen { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-10px, 0, 0); }
+            20%, 80% { transform: translate3d(15px, 5px, 0); }
+            30%, 50%, 70% { transform: translate3d(-20px, -5px, 0); }
+            40%, 60% { transform: translate3d(20px, 10px, 0); }
+        }
+
+        #crack-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.4); z-index: 9999;
+            opacity: 0; pointer-events: none; transition: opacity 0.1s;
+        }
+
+        #intro-modal {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9); padding: 30px; border-radius: 15px;
+            text-align: center; color: white; z-index: 10000;
+            display: none; box-shadow: 0 0 30px rgba(0,0,0,0.8); width: 80%; max-width: 400px; box-sizing: border-box;
+        }
+        #intro-btn {
+            margin-top: 20px; padding: 15px 30px; font-size: 18px; font-weight: bold;
+            background-color: #ff3333; color: white; border: none; border-radius: 10px;
+            cursor: pointer; box-shadow: 0 0 15px rgba(255,0,0,0.6); width: 100%; box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="crack-overlay">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%; height:100%;">
+            <path d="M45,45 L-10,-10 M45,45 L30,-10 M45,45 L80,-10 M45,45 L110,20 M45,45 L110,70 M45,45 L70,110 M45,45 L20,110 M45,45 L-10,60" stroke="rgba(255,255,255,0.9)" stroke-width="1.5" />
+            <path d="M45,45 L10,10 L30,0 M45,45 L90,10 L100,40 M45,45 L80,90 L40,100 M45,45 L0,70 Z" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="0.5" />
+        </svg>
+    </div>
+
+    <div id="intro-modal">
+        <h2 style="margin-top:0; color:#ff5555;">방관자 체험 종료</h2>
+        <p style="line-height:1.6; font-size:16px;">당신은 방금 사이버 폭력의 무력함을 체험했습니다.<br>이제 침묵을 깨고 상황을 바꿀 차례입니다.</p>
+        <button id="intro-btn" onclick="finishIntro()">방어자 되어보기 (시뮬레이션 시작)</button>
+    </div>
+
+    <header>2학년 3반 단톡방</header>
+    <div id="chat-box"></div>
+    
+    <div id="input-area">
+        <input type="text" id="suggestion" placeholder="방어자가 되어 메시지를 입력하세요...">
+        <button id="send-btn" onclick="sendSuggestion()">전송</button>
+    </div>
+
+    <script>
+        var socket = io();
+        var chatBox = document.getElementById('chat-box');
+        var inputArea = document.getElementById('input-area');
+        
+        var introTexts = [
+            { sender: "주동자", msg: "야 왜 안 읽냐?" },
+            { sender: "동조자1", msg: "ㅋㅋㅋ 쫄아서 폰 끈 거 아님?" },
+            { sender: "주동자", msg: "진짜 개빡치게 하네 너 내일 학교 오면 보자" },
+            { sender: "동조자2", msg: "다 보고 있는 거 안다 숨지 마라 ㅡㅡ" },
+            { sender: "주동자", msg: "대답 안 해? ㅁㅊㄴ인가 진짜" },
+            { sender: "동조자1", msg: "야 단톡방 나가지 마라 다시 초대한다" },
+            { sender: "주동자", msg: "찐따새끼 ㅋㅋㅋㅋ" },
+            { sender: "동조자2", msg: "아 ㅈㄴ 웃기네 ㅋㅋㅋ" },
+            { sender: "동조자1", msg: "야 읽씹 오지네 ㅋㅋ 손가락 부러짐?" },
+            { sender: "주동자", msg: "방 나가면 뒤진다 진짜 ㅋㅋ" }
+        ];
+
+        var introIndex = 0;
+        var introActive = true;
+
+        function appendMessage(sender, text) {
+            var wrapper = document.createElement('div');
+            wrapper.className = 'msg-wrapper bot-wrapper';
+            
+            var nameDiv = document.createElement('div');
+            nameDiv.className = 'sender-name';
+            nameDiv.innerText = sender;
+            wrapper.appendChild(nameDiv);
+            
+            var msgDiv = document.createElement('div');
+            msgDiv.className = 'msg ' + (sender === '우리 반' ? 'user' : 'bot');
+            msgDiv.innerText = text;
+            wrapper.appendChild(msgDiv);
+            
+            chatBox.appendChild(wrapper);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function runIntro() {
+            if(!introActive) return;
+
+            appendMessage(introTexts[introIndex].sender, introTexts[introIndex].msg);
+            introIndex++;
+
+            if (introIndex < introTexts.length) {
+                var delay = Math.floor(Math.random() * 500) + 300;
+                setTimeout(runIntro, delay);
+            } else {
+                setTimeout(crackScreen, 1000);
+            }
+        }
+
+        function crackScreen() {
+            document.body.classList.add('shake-screen');
+            document.getElementById('crack-overlay').style.opacity = '1';
+            setTimeout(function() {
+                document.getElementById('intro-modal').style.display = 'block';
+            }, 1000);
+        }
+
+        function finishIntro() {
+            introActive = false;
+            document.getElementById('intro-modal').style.display = 'none';
+            
+            // 모달 및 오버레이를 완전히 DOM에서 숨겨서 터치 방해 금지
+            document.getElementById('crack-overlay').style.display = 'none'; 
+            document.body.classList.remove('shake-screen');
+            
+            chatBox.innerHTML = ''; 
+            
+            var startScenario = [
+                { sender: "주동자", msg: "야 오늘 체육시간에 저새끼 뚝딱거리는 거 본 사람? ㅋㅋㅋ" },
+                { sender: "동조자1", msg: "아 ㅋㅋㅋ 진짜 개에바였음 ㅈㄴ 뇌절하더라" },
+                { sender: "주동자", msg: "찐따련 지가 뭐라도 되는 줄 아나봄 ㅇㅇ" },
+                { sender: "동조자2", msg: "아 사진 찍어놨어야 했는데 개아깝네 ㅋㅋㅋ" },
+                { sender: "주동자", msg: "야 ㅋㅋ 여기 단톡방 다 보고 있는 거 아니까 숨지 말고 말해봐" }
+            ];
+            
+            startScenario.forEach(function(item) {
+                appendMessage(item.sender, item.msg);
+            });
+
+            // 입력창을 강제로 flex로 띄움
+            inputArea.style.display = 'flex';
+            
+            setTimeout(function() {
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }, 100);
+        }
+
+        window.onload = function() {
+            setTimeout(runIntro, 1000);
+        };
+
+        socket.on('chat_update', function(data) {
+            if(introActive) return; 
+
+            var isBot = data.sender !== '우리 반';
+            var wrapper = document.createElement('div');
+            wrapper.className = 'msg-wrapper ' + (isBot ? 'bot-wrapper' : 'user-wrapper');
+            
+            if(isBot) {
+                var nameDiv = document.createElement('div');
+                nameDiv.className = 'sender-name';
+                nameDiv.innerText = data.sender;
+                wrapper.appendChild(nameDiv);
+            }
+            
+            var msgDiv = document.createElement('div');
+            msgDiv.className = 'msg ' + (isBot ? 'bot' : 'user');
+            msgDiv.innerText = data.message;
+            wrapper.appendChild(msgDiv);
+            
+            chatBox.appendChild(wrapper);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        });
+
+        function sendSuggestion() {
+            var input = document.getElementById('suggestion');
+            if(input.value.trim() !== '') {
+                socket.emit('submit_suggestion', { message: input.value });
+                input.value = '';
+            }
+        }
+
+        document.getElementById('suggestion').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') { sendSuggestion(); }
+        });
+    </script>
+</body>
+</html>

@@ -1,11 +1,8 @@
 import os
-from flask import Flask, render_template, request
-from flask_socketio import SocketIO, emit
 import google.generativeai as genai
 
-# Gemini API 설정 (AIzaSyCtGgdp5dusK4Add15qX1Wr_okXXPRu3aU)
-# genai.configure(api_key="AIzaSyCtGgdp5dusK4Add15qX1Wr_okXXPRu3aU") 
-genai.configure(api_key="AIzaSyDPlLYlThX8I04TUyFyIorpsJwLpukT0eU")
+my_api_key = os.environ.get("AIzaSyCMEaIo9Bn4_Wyeb8xR_hCs8Qjg_Xer43M")
+genai.configure(api_key=my_api_key)
 
 # 사용 가능한 모델을 자동으로 찾아서 연결하는 코드
 valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]

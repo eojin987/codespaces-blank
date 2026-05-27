@@ -75,7 +75,8 @@ def handle_send_to_bot(data):
                     msg_text = parts[1].strip()
             
             emit('chat_update', {'sender': sender_name, 'message': msg_text}, broadcast=True)
-                
+    except ValueError:
+            emit('chat_update', {'sender': '주동자', 'message': '뭐라는 거야 ㅡㅡ 장난하냐? 똑바로 말해'}, broadcast=True)
     except Exception as e:
         emit('chat_update', {'sender': '시스템', 'message': "오류가 발생했습니다: " + str(e)}, broadcast=True)
 

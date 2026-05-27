@@ -1,7 +1,14 @@
-from flask import Flask, render_template
-from flask_socketio import SocketIO
+import eventlet
+eventlet.monkey_patch()
+
 import os
+from flask import Flask, render_template
+from flask_socketio import SocketIO, emit
 import google.generativeai as genai
+
+app = Flask(__name__)
+# async_mode='eventlet'을 추가해서 엔진을 강제 지정
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 my_api_key = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=my_api_key)

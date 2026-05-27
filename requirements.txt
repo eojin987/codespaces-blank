@@ -1,5 +1,5 @@
 Flask
 Flask-SocketIO
 google-generativeai
-gunicorn
+gunicorn==21.2.0
 eventlet

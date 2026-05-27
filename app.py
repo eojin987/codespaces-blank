@@ -1,7 +1,7 @@
 import os
 import google.generativeai as genai
 
-my_api_key = os.environ.get("GEMNI_API_KEY")
+my_api_key = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=my_api_key)
 
 # 사용 가능한 모델을 자동으로 찾아서 연결하는 코드
